@@ -1,0 +1,205 @@
+CREATE DATABASE social_feed;
+
+USE social_feed;
+
+CREATE TABLE posts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Social Media Feed</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>Social Media Feed</h1>
+
+<div class="postBox">
+    <textarea id="postInput" placeholder="Write a post..."></textarea>
+    <button onclick="addPost()">Post</button>
+</div>
+
+<h2>Your Feed</h2>
+<div id="feed"></div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
+body {
+    font-family: Arial, sans-serif;
+    background: #eef1f5;
+    max-width: 800px;
+    margin: auto;
+    padding: 20px;
+}
+
+.postBox textarea {
+    width: 100%;
+    height: 90px;
+    padding: 10px;
+}
+
+.postBox button {
+    margin-top: 10px;
+    padding: 10px 20px;
+}
+
+.post {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.post small {
+    color: #555;
+}
+// Node structure for Linked List
+class Node {
+    constructor(post) {
+        this.post = post;
+        this.next = null;
+    }
+}
+
+// Linked List
+class LinkedList {
+    constructor() {
+        this.head = null;
+    }
+
+    // Add new post at front
+    add(post) {
+        const newNode = new Node(post);
+        newNode.next = this.head;
+        this.head = newNode;
+    }
+
+    // Remove by ID
+    remove(id) {
+        if (!this.head) return;
+
+        if (this.head.post.id == id) {
+            this.head = this.head.next;
+            return;
+        }
+
+        let current = this.head;
+        while (current.next && current.next.post.id != id) {
+            current = current.next;
+        }
+
+        if (current.next) current.next = current.next.next;
+    }
+
+    // Traverse → convert into array for display
+    toArray() {
+        let arr = [];
+        let current = this.head;
+
+        while (current) {
+            arr.push(current.post);
+            current = current.next;
+        }
+
+        return arr;
+    }
+}
+
+let feed = new LinkedList();
+
+// Send post to database
+function addPost() {
+    let content = document.getElementById("postInput").value.trim();
+    if (content === "") return alert("Please write something");
+
+    fetch("create.php", {
+        method: "POST",
+        headers: {"Content-Type": "application/x-www-form-urlencoded"},
+        body: "content=" + encodeURIComponent(content)
+    }).then(() => loadPosts());
+
+    document.getElementById("postInput").value = "";
+}
+
+// Load posts from database
+function loadPosts() {
+    fetch("read.php")
+        .then(res => res.json())
+        .then(posts => {
+            feed = new LinkedList();
+
+            posts.forEach(p => feed.add(p)); // add to Linked List
+
+            renderFeed();
+        });
+}
+
+// Delete a post
+function deletePost(id) {
+    fetch("delete.php?id=" + id)
+        .then(() => loadPosts());
+}
+
+// Display posts
+function renderFeed() {
+    let feedDiv = document.getElementById("feed");
+    feedDiv.innerHTML = "";
+
+    const posts = feed.toArray();
+
+    posts.forEach(post => {
+        let card = document.createElement("div");
+        card.className = "post";
+
+        card.innerHTML = `
+            <p>${post.content}</p>
+            <small>${post.created_at}</small><br>
+            <button onclick="deletePost(${post.id})">Delete</button>
+        `;
+
+        feedDiv.appendChild(card);
+    });
+}
+
+loadPosts(); // initial load
+<?php
+$conn = new mysqli("localhost", "root", "", "social_feed");
+
+$content = $_POST['content'];
+
+$stmt = $conn->prepare("INSERT INTO posts (content) VALUES (?)");
+$stmt->bind_param("s", $content);
+$stmt->execute();
+
+echo "ok";
+?>
+<?php
+$conn = new mysqli("localhost", "root", "", "social_feed");
+
+$result = $conn->query("SELECT * FROM posts ORDER BY id DESC");
+
+$posts = [];
+while ($row = $result->fetch_assoc()) {
+    $posts[] = $row;
+}
+
+echo json_encode($posts);
+?>
+<?php
+$conn = new mysqli("localhost", "root", "", "social_feed");
+
+$id = $_GET['id'];
+
+$stmt = $conn->prepare("DELETE FROM posts WHERE id = ?");
+$stmt->bind_param("i", $id);
+$stmt->execute();
+
+echo "deleted";
+?>
